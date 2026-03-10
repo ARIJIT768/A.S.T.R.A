@@ -1,190 +1,127 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Call Gemini API to get health analysis
-async function getHealthAnalysisFromGemini(temperature: number, humidity?: number, bpm?: number, spO2?: number) {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    if (!apiKey) {
-      console.warn('GEMINI_API_KEY not set, using fallback response');
-      return getFallbackHealthAnalysis(temperature, humidity, bpm, spO2);
-    }
+// 1. Setup Clients
+// We use the Service Role Key here because the ESP32 cannot send browser session cookies.
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-    let sensorData = `Temperature: ${temperature}°C`;
-    if (humidity !== undefined) {
-      sensorData += `\nHumidity: ${humidity}%`;
-    }
-    if (bpm !== undefined) {
-      sensorData += `\nHeart Rate (BPM): ${bpm}`;
-    }
-    if (spO2 !== undefined) {
-      sensorData += `\nBlood Oxygen (SpO2): ${spO2}%`;
-    }
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-    const prompt = `You are a health advisor AI. Based on the following sensor readings from a patient's health monitoring device, provide a brief health analysis and recommendations (2-3 sentences max, friendly tone):
-
-${sensorData}
-
-Provide assessment and any recommendations. Keep it concise and encouraging.`;
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Gemini API error:', response.status, errorData);
-      return getFallbackHealthAnalysis(temperature, humidity, bpm, spO2);
-    }
-
-    const data = await response.json();
-    
-    if (data.candidates && data.candidates.length > 0) {
-      const textContent = data.candidates[0].content.parts[0].text;
-      return textContent || getFallbackHealthAnalysis(temperature, humidity, bpm, spO2);
-    }
-    
-    return getFallbackHealthAnalysis(temperature, humidity, bpm, spO2);
-  } catch (error) {
-    console.error('Error calling Gemini API:', error);
-    return getFallbackHealthAnalysis(temperature, humidity, bpm, spO2);
-  }
-}
-
-// Fallback response if Gemini API fails
-function getFallbackHealthAnalysis(temperature: number, humidity?: number, bpm?: number, spO2?: number) {
-  let analysis = `Temperature reading: ${temperature}°C. `;
-  
-  if (temperature < 36.5) {
-    analysis += 'Your temperature is slightly low. Stay warm and hydrated. ';
-  } else if (temperature <= 37.5) {
-    analysis += 'Your temperature is normal. ';
-  } else if (temperature <= 38.5) {
-    analysis += 'Your temperature is slightly elevated. Monitor and stay hydrated. ';
-  } else {
-    analysis += 'Your temperature is high. Consider consulting a healthcare provider. ';
-  }
-
-  if (humidity) {
-    analysis += `Humidity: ${humidity}%. `;
-  }
-
-  if (bpm !== undefined) {
-    if (bpm < 60) {
-      analysis += `Heart rate ${bpm} BPM is low. `;
-    } else if (bpm <= 100) {
-      analysis += `Heart rate ${bpm} BPM is normal. `;
-    } else {
-      analysis += `Heart rate ${bpm} BPM is elevated. `;
-    }
-  }
-
-  if (spO2 !== undefined) {
-    if (spO2 >= 95) {
-      analysis += `Blood oxygen ${spO2}% is excellent. Stay healthy!`;
-    } else if (spO2 >= 90) {
-      analysis += `Blood oxygen ${spO2}% is good.`;
-    } else {
-      analysis += `Blood oxygen ${spO2}% is low. Monitor closely.`;
-    }
-  }
-  
-  return analysis;
+// Helper: Convert raw ESP32 PCM audio to a valid WAV file format for Gemini
+function createWavHeader(dataLength: number, sampleRate = 16000) {
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataLength, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16); // PCM
+  header.writeUInt16LE(1, 20); // AudioFormat (1 = PCM)
+  header.writeUInt16LE(1, 22); // NumChannels (1 = Mono)
+  header.writeUInt32LE(sampleRate, 24); // SampleRate
+  header.writeUInt32LE(sampleRate * 2, 28); // ByteRate
+  header.writeUInt16LE(2, 32); // BlockAlign
+  header.writeUInt16LE(16, 34); // BitsPerSample
+  header.write('data', 36);
+  header.writeUInt32LE(dataLength, 40);
+  return header;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the user from Supabase auth
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // 2. Extract Vitals from Custom ESP32 Headers
+    const temp = request.headers.get('X-Temp');
+    const bpm = request.headers.get('X-Bpm');
+    const spo2 = request.headers.get('X-Spo2');
 
-    if (sessionError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // 3. Extract Raw Audio Bytes from ESP32 Body
+    const rawAudio = await request.arrayBuffer();
+    const audioData = Buffer.from(rawAudio);
+
+    if (audioData.length === 0) {
+      return NextResponse.json({ error: 'No audio data received' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { temperature, humidity, bpm, spO2, deviceId } = body;
+    // 4. Format Audio for Gemini
+    // The ESP32 mic records raw waves. Gemini needs a WAV container to understand it.
+    const wavHeader = createWavHeader(audioData.length);
+    const validWavFile = Buffer.concat([wavHeader, audioData]);
 
-    if (!temperature) {
-      return NextResponse.json({ error: 'Missing temperature' }, { status: 400 });
-    }
+    // 5. Call Gemini 1.5 Flash (Multimodal Audio + Text)
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `You are A.S.T.R.A, a friendly AI health assistant.
+    The user has submitted a voice question. Listen to the attached audio.
+    Here are their current real-time vitals:
+    - Temperature: ${temp}°C
+    - Heart Rate: ${bpm} BPM
+    - Blood Oxygen: ${spo2}%
 
-    // Generate AI analysis
-    const aiResponse = await getHealthAnalysisFromGemini(temperature, humidity, bpm, spO2);
+    Respond directly to their voice question while taking these vitals into account.
+    Keep your response brief (2-3 sentences max) so it can be spoken aloud easily.`;
 
-    // Insert health data into Supabase
-    const { data: healthEntry, error: insertError } = await supabase
-      .from('health_data')
-      .insert({
-        user_id: session.user.id,
-        temperature,
-        humidity: humidity || null,
-        bpm: bpm || null,
-        spo2: spO2 || null,
-        ai_response: aiResponse,
-      })
-      .select()
-      .single();
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: validWavFile.toString("base64"),
+          mimeType: "audio/wav"
+        }
+      }
+    ]);
 
-    if (insertError) {
-      console.error('Error inserting health data:', insertError);
-      return NextResponse.json({ error: 'Failed to save health data' }, { status: 500 });
-    }
+    const geminiTextResponse = result.response.text();
 
-    return NextResponse.json({
-      id: healthEntry.id,
-      temperature: healthEntry.temperature,
-      humidity: healthEntry.humidity,
-      bpm: healthEntry.bpm,
-      spO2: healthEntry.spo2,
-      aiResponse: healthEntry.ai_response,
-      timestamp: healthEntry.created_at,
-      message: 'Health data saved and analyzed successfully',
+    // 6. Save to Supabase (Background Logging)
+    await supabaseAdmin.from('health_data').insert({
+      temperature: parseFloat(temp || '0'),
+      bpm: parseInt(bpm || '0'),
+      spo2: parseInt(spo2 || '0'),
+      ai_response: geminiTextResponse,
     });
-  } catch (error) {
-    console.error('Error saving health data:', error);
-    return NextResponse.json({ error: 'Failed to save health data' }, { status: 500 });
-  }
-}
 
-export async function GET(request: NextRequest) {
-  try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // 7. Convert Text Response to Speech (Google Cloud TTS)
+    const ttsApiKey = process.env.GOOGLE_TTS_API_KEY; 
+    let audioOutputBuffer = Buffer.from([]);
 
-    if (sessionError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (ttsApiKey) {
+      const ttsResponse = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${ttsApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { text: geminiTextResponse },
+          voice: { languageCode: 'en-US', name: 'en-US-Journey-F' }, // Premium AI Voice
+          audioConfig: {
+            audioEncoding: 'LINEAR16', // Crucial: ESP32 Amplifier requires raw Linear PCM!
+            sampleRateHertz: 16000
+          }
+        })
+      });
+
+      const ttsData = await ttsResponse.json();
+      
+      if (ttsData.audioContent) {
+        audioOutputBuffer = Buffer.from(ttsData.audioContent, 'base64');
+        // Strip the 44-byte WAV header generated by Google so the ESP32 gets pure raw audio data
+        audioOutputBuffer = audioOutputBuffer.subarray(44); 
+      }
+    } else {
+      console.warn("Missing GOOGLE_TTS_API_KEY. No voice audio generated.");
     }
 
-    const { data: healthRecords, error: queryError } = await supabase
-      .from('health_data')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
+    // 8. Stream Raw Audio Bytes Back to the ESP32 Amplifier
+    return new NextResponse(audioOutputBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': audioOutputBuffer.length.toString(),
+      },
+    });
 
-    if (queryError) {
-      console.error('Error fetching health data:', queryError);
-      return NextResponse.json({ error: 'Failed to fetch health data' }, { status: 500 });
-    }
-
-    return NextResponse.json(healthRecords || []);
   } catch (error) {
-    console.error('Error fetching health data:', error);
-    return NextResponse.json({ error: 'Failed to fetch health data' }, { status: 500 });
+    console.error('Error processing interaction:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
-
