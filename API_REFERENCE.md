@@ -1,4 +1,4 @@
-# API Reference - MediCare Backend
+# API Reference - A.S.T.R.A Backend
 
 ## Authentication Endpoints
 

@@ -57,7 +57,7 @@ export default function Login() {
             <span className="text-white font-bold text-2xl">M</span>
           </div>
           {/* Updated gradient to match the signup page (green instead of blue) */}
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">MediCare</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">A.S.T.R.A</h1>
           <p className="text-slate-400 mt-2 font-medium">Welcome back</p>
         </div>
 

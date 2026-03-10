@@ -71,7 +71,7 @@ export default function Signup() {
           <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg transform hover:scale-110 transition-transform duration-300 animate-float">
             <span className="text-white font-bold text-2xl">M</span>
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">MediCare</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">A.S.T.R.A</h1>
           <p className="text-slate-400 mt-2 font-medium">Create your health account</p>
         </div>
 

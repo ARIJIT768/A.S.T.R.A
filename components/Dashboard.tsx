@@ -4,10 +4,24 @@ export default function Dashboard() {
   return (
     <main className="flex-1 overflow-auto bg-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Welcome back, John</h1>
-          <p className="text-slate-600 mt-2">Here's your health overview for today</p>
+        
+        {/* Welcome & Logo Section */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Welcome back, John</h1>
+            <p className="text-slate-600 mt-2">Here's your health overview for today</p>
+          </div>
+          
+          {/* New Logo Section */}
+          <div className="flex items-center gap-3 bg-white p-3 rounded-2xl shadow-sm border border-slate-200 w-fit">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-md shadow-green-500/20">
+              <span className="text-white font-bold text-2xl">M</span>
+            </div>
+            <div className="pr-2">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-green-500 to-green-700 bg-clip-text text-transparent leading-tight">A.S.T.R.A</h2>
+              <p className="text-[10px] text-slate-500 font-bold tracking-wider uppercase">Health Portal</p>
+            </div>
+          </div>
         </div>
 
         {/* Key Stats */}
@@ -78,7 +92,7 @@ export default function Dashboard() {
                 status="Pending"
               />
             </div>
-            <button className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition">
+            <button className="mt-4 w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition">
               View All Appointments
             </button>
           </div>

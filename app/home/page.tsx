@@ -67,7 +67,7 @@ export default function Home() {
             <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-green-700 rounded-lg flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform duration-300">
               <span className="text-white font-bold text-lg">M</span>
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">MediCare</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">A.S.T.R.A</span>
           </div>
 
           <div className="flex items-center gap-6">

@@ -8,7 +8,7 @@ export default function Header() {
           <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-lg">M</span>
           </div>
-          <span className="text-xl font-bold text-slate-900">MediCare</span>
+          <span className="text-xl font-bold text-slate-900">A.S.T.R.A</span>
         </div>
         
         <nav className="hidden md:flex items-center gap-8">

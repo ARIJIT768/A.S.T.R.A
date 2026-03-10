@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MediCare - Your Personal Health Dashboard",
+  title: "A.S.T.R.A - Your Personal Health Dashboard",
   description: "A comprehensive medical application for managing your health and appointments with ESP32 integration",
 };
 

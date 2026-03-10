@@ -1,4 +1,4 @@
-# MediCare - Medical App with ESP32 Integration
+# A.S.T.R.A - Medical App with ESP32 Integration
 
 A full-stack medical app that integrates with ESP32 devices to monitor health data with AI analysis.
 

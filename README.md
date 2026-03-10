@@ -1,4 +1,4 @@
-# MediCare - ESP32 Integrated Medical Application
+# A.S.T.R.A - ESP32 Integrated Medical Application
 
 A modern, full-stack medical application that integrates with ESP32 hardware to monitor real-time health metrics. Features include user authentication, temperature tracking with AI analysis via Gemini API, and a comprehensive health dashboard.
 

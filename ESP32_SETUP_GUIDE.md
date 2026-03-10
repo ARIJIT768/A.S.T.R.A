@@ -1,6 +1,6 @@
 # ESP32 Medical App Integration Guide
 
-This guide explains how to set up your ESP32 device to work with the MediCare medical app and Gemini AI for real-time health monitoring and analysis.
+This guide explains how to set up your ESP32 device to work with the A.S.T.R.A medical app and Gemini AI for real-time health monitoring and analysis.
 
 ## Prerequisites
 
@@ -126,7 +126,7 @@ The app will run at `http://localhost:3000`
 
 ### How It Works
 
-1. **ESP32 Powers On**: Shows "MediCare Ready!" on TFT display
+1. **ESP32 Powers On**: Shows "A.S.T.R.A Ready!" on TFT display
 2. **WiFi Connection**: Connects to your WiFi network
 3. **Ready to Detect**: Waits for PIR motion sensor trigger
 4. **Motion Detected**: 
@@ -146,7 +146,7 @@ The app will run at `http://localhost:3000`
 
 | Message | Meaning |
 |---------|---------|
-| "MediCare Ready!" | Device initialized successfully |
+| "A.S.T.R.A Ready!" | Device initialized successfully |
 | "WiFi OK!" | Connected to WiFi network |
 | "WiFi Failed!" | Could not connect to WiFi - check credentials |
 | "Sending Data..." | Sending temperature to API |
@@ -259,7 +259,7 @@ Returns all health readings for logged-in user (sorted newest first)
 - [Arduino ESP32 Docs](https://docs.espressif.com/projects/arduino-esp32/)
 - [Adafruit DHT Library](https://github.com/adafruit/DHT-sensor-library)
 - [Google Generative AI API](https://ai.google.dev/)
-- [MediCare App Documentation](./README.md)
+- [A.S.T.R.A App Documentation](./README.md)
 
 ---
 
