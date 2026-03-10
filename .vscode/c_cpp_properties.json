@@ -1,0 +1,15 @@
+{
+  "configurations": [
+    {
+      "name": "Arduino",
+      "includePath": [],
+      "defines": [],
+      "intelliSenseMode": "gcc-x86",
+      "browse": {
+        "path": [],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
+}
