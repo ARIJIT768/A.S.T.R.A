@@ -30,24 +30,43 @@ function createWavHeader(dataLength: number, sampleRate = 8000) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 2. Extract Data from ESP32 Headers
+    // 2. Extract Data AND Both Identifiers from ESP32 Headers
     const deviceId = request.headers.get('X-Device-Id') || 'unknown-device';
-    const userName = request.headers.get('X-User-Name'); // <-- The ESP32 sends the unique name!
+    const userNameHeader = request.headers.get('X-User-Name'); 
+    const userEmailHeader = request.headers.get('X-User-Email'); // <-- Extract the email!
+    
     const temp = request.headers.get('X-Temp');
     const bpm = request.headers.get('X-Bpm');
     const spo2 = request.headers.get('X-Spo2');
 
-    if (!userName) {
-      return NextResponse.json({ error: 'Missing X-User-Name in headers' }, { status: 400 });
+    if (!userEmailHeader && !userNameHeader) {
+      return NextResponse.json({ error: 'Missing User Identification headers' }, { status: 400 });
     }
 
-    // 3. INTEGRATION: Fetch Age and Gender using the UNIQUE NAME
-    const { data: userProfile, error: profileError } = await supabaseAdmin
-      .from('users')
-      .select('id, age, gender')
-      .eq('name', userName) // <-- Searching by unique name!
-      .single();
+    // 3. INTEGRATION: Fetch Profile using Email (Safest) or Name (Fallback)
+    let userProfile = null;
 
+    if (userEmailHeader) {
+      // Prioritize searching by Email since it is guaranteed to be unique
+      const { data } = await supabaseAdmin
+        .from('users')
+        .select('id, name, age, gender')
+        .eq('email', userEmailHeader)
+        .single();
+      userProfile = data;
+    } else if (userNameHeader) {
+      // Fallback: If no email was sent, try the name (limit 1 prevents crashes if duplicates exist)
+      const { data } = await supabaseAdmin
+        .from('users')
+        .select('id, name, age, gender')
+        .eq('name', userNameHeader)
+        .limit(1)
+        .single();
+      userProfile = data;
+    }
+
+    // Assign final values to feed to Gemini
+    const finalUserName = userProfile?.name || userNameHeader || 'Patient';
     const userAge = userProfile?.age || 'unknown age';
     const userGender = userProfile?.gender || 'unknown gender';
     const userId = userProfile?.id || null;
@@ -66,7 +85,7 @@ export async function POST(request: NextRequest) {
     // 5. Call Gemini
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
     const prompt = `You are A.S.T.R.A, a friendly AI health assistant.
-    The user's name is ${userName}. They are a ${userAge} year old ${userGender}.
+    The user's name is ${finalUserName}. They are a ${userAge} year old ${userGender}.
     Greet them by their name.
     
     Listen to their attached voice question.
@@ -93,7 +112,7 @@ export async function POST(request: NextRequest) {
     // 6. Save to Supabase
     await supabaseAdmin.from('health_data').insert({
       device_id: deviceId,
-      user_id: userId, // Links the health data to their web account!
+      user_id: userId, // Accurately linked via unique email
       temperature: parseFloat(temp || '0'),
       bpm: parseInt(bpm || '0'),
       spo2: parseInt(spo2 || '0'),
