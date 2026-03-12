@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// 1. Setup Clients
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -30,48 +29,22 @@ function createWavHeader(dataLength: number, sampleRate = 8000) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 2. Extract Data AND Both Identifiers from ESP32 Headers
     const deviceId = request.headers.get('X-Device-Id') || 'unknown-device';
-    const userNameHeader = request.headers.get('X-User-Name'); 
-    const userEmailHeader = request.headers.get('X-User-Email'); // <-- Extract the email!
-    
     const temp = request.headers.get('X-Temp');
     const bpm = request.headers.get('X-Bpm');
     const spo2 = request.headers.get('X-Spo2');
 
-    if (!userEmailHeader && !userNameHeader) {
-      return NextResponse.json({ error: 'Missing User Identification headers' }, { status: 400 });
-    }
+    // 1. Fetch ALL registered users from your database
+    const { data: allUsers, error: usersError } = await supabaseAdmin
+      .from('users')
+      .select('id, name, age, gender');
 
-    // 3. INTEGRATION: Fetch Profile using Email (Safest) or Name (Fallback)
-    let userProfile = null;
+    if (usersError) throw usersError;
 
-    if (userEmailHeader) {
-      // Prioritize searching by Email since it is guaranteed to be unique
-      const { data } = await supabaseAdmin
-        .from('users')
-        .select('id, name, age, gender')
-        .eq('email', userEmailHeader)
-        .single();
-      userProfile = data;
-    } else if (userNameHeader) {
-      // Fallback: If no email was sent, try the name (limit 1 prevents crashes if duplicates exist)
-      const { data } = await supabaseAdmin
-        .from('users')
-        .select('id, name, age, gender')
-        .eq('name', userNameHeader)
-        .limit(1)
-        .single();
-      userProfile = data;
-    }
+    // Convert the user list to a string so Gemini can read it
+    const knownUsersString = JSON.stringify(allUsers);
 
-    // Assign final values to feed to Gemini
-    const finalUserName = userProfile?.name || userNameHeader || 'Patient';
-    const userAge = userProfile?.age || 'unknown age';
-    const userGender = userProfile?.gender || 'unknown gender';
-    const userId = userProfile?.id || null;
-
-    // 4. Extract Raw Audio
+    // 2. Extract Raw Audio
     const rawAudio = await request.arrayBuffer();
     const audioData = Buffer.from(rawAudio);
 
@@ -82,20 +55,29 @@ export async function POST(request: NextRequest) {
     const wavHeader = createWavHeader(audioData.length, 8000);
     const validWavFile = Buffer.concat([wavHeader, audioData]);
 
-    // 5. Call Gemini
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); 
-    const prompt = `You are A.S.T.R.A, a friendly AI health assistant.
-    The user's name is ${finalUserName}. They are a ${userAge} year old ${userGender}.
-    Greet them by their name.
-    
-    Listen to their attached voice question.
-    Here are their current real-time vitals:
-    - Temperature: ${temp}°C
-    - Heart Rate: ${bpm} BPM
-    - Blood Oxygen: ${spo2}%
+    // 3. Call Gemini with JSON Mode enabled
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: { responseMimeType: "application/json" } // Forces Gemini to reply in JSON!
+    }); 
 
-    Respond directly to their voice question while taking their vitals, age, and gender into account.
-    Keep your response brief (2-3 sentences max). Do not use markdown formatting, asterisks, or emojis.`;
+    const prompt = `You are A.S.T.R.A, an AI health assistant.
+    Listen to the attached audio. The user will likely state their name or ask a medical question.
+    
+    Here is the list of registered users in the household: ${knownUsersString}
+    Here are the user's current vitals from the sensor: Temp: ${temp}°C, HR: ${bpm} BPM, SpO2: ${spo2}%
+
+    YOUR TASKS:
+    1. Identify who is speaking by matching the name they say in the audio to the list of known users.
+    2. If you find a match, use their specific age and gender to inform your medical response.
+    3. Generate a helpful, 2-3 sentence verbal response.
+    
+    You MUST output valid JSON using this exact schema:
+    {
+      "identified_user_id": "the 'id' of the matching user from the list, or null if unknown",
+      "identified_name": "the name of the user, or 'Unknown'",
+      "ai_response": "your 2-3 sentence medical response"
+    }`;
 
     const result = await model.generateContent([
       prompt,
@@ -107,20 +89,21 @@ export async function POST(request: NextRequest) {
       }
     ]);
 
-    const geminiTextResponse = result.response.text();
+    // 4. Parse Gemini's JSON response
+    const aiOutput = JSON.parse(result.response.text());
 
-    // 6. Save to Supabase
+    // 5. Save the perfectly mapped data to Supabase
     await supabaseAdmin.from('health_data').insert({
       device_id: deviceId,
-      user_id: userId, // Accurately linked via unique email
+      user_id: aiOutput.identified_user_id, // Automatically links to the right account!
       temperature: parseFloat(temp || '0'),
       bpm: parseInt(bpm || '0'),
       spo2: parseInt(spo2 || '0'),
-      ai_response: geminiTextResponse,
+      ai_response: aiOutput.ai_response,
     });
 
     return NextResponse.json(
-      { success: true, message: 'Audio processed and saved.' }, 
+      { success: true, message: 'Audio processed.', response: aiOutput.ai_response }, 
       { status: 200 }
     );
 
