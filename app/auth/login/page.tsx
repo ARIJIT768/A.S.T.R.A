@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Login() {
@@ -53,10 +54,20 @@ export default function Login() {
 
       <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10 backdrop-blur-sm border border-slate-700/50 animate-fade-in">
         <div className="mb-8 text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg transform hover:scale-110 transition-transform duration-300 animate-float">
-            <span className="text-white font-bold text-2xl">M</span>
+          
+          {/* --- UPDATED LOGO SECTION --- */}
+          <div className="w-16 h-16 mx-auto mb-4 relative shadow-lg transform hover:scale-110 transition-transform duration-300 animate-float rounded-xl overflow-hidden bg-slate-800/50 flex items-center justify-center">
+            <Image 
+              src="/logo.jpeg" 
+              alt="A.S.T.R.A Logo" 
+              fill
+              className="object-contain p-1"
+              sizes="64px"
+              priority
+            />
           </div>
-          {/* Updated gradient to match the signup page (green instead of blue) */}
+          {/* ---------------------------- */}
+
           <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">A.S.T.R.A</h1>
           <p className="text-slate-400 mt-2 font-medium">Welcome back</p>
         </div>
