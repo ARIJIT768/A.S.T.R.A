@@ -9,14 +9,15 @@
 #include <SPI.h>
 #include <WiFiManager.h> 
 
-// --- Network Settings ---
-// Replace with your laptop's IP address!
+// ==========================================
+// 1. CONFIGURATION
+// ==========================================
+// Pointing to your specific laptop IP address!
 const char* nextjs_api_url = "http://10.150.208.31:3000/api/gemini-health"; 
 
-// --- Calibration & Config ---
 const float TEMP_OFFSET = 2.5; 
 #define PIR_PIN 13
-#define RECORD_TIME 3 
+#define RECORD_TIME 3 // 3 Seconds perfectly fits in standard ESP32 RAM
 #define SAMPLE_RATE 16000
 
 // TFT Pins
@@ -29,7 +30,9 @@ const float TEMP_OFFSET = 2.5;
 #define I2S_MIC_SD 32
 #define I2S_MIC_SCK 14
 
-// --- Initializations ---
+// ==========================================
+// 2. GLOBAL OBJECTS
+// ==========================================
 MAX30105 particleSensor;
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
@@ -40,7 +43,7 @@ int centerY = (screenH / 2) + 10;
 String deviceMacAddress = "";
 
 // ==========================================
-// UI DRAWING FUNCTIONS
+// 3. UI DRAWING FUNCTIONS
 // ==========================================
 void playBootAnimation() {
   tft.fillScreen(ST77XX_BLACK);
@@ -62,18 +65,25 @@ void playBootAnimation() {
 }
 
 void drawThermometerIcon(int x, int y) {
-  tft.fillRoundRect(x - 2, y - 8, 5, 14, 2, ST77XX_WHITE); tft.fillCircle(x, y + 5, 5, ST77XX_RED);
+  tft.fillRoundRect(x - 2, y - 8, 5, 14, 2, ST77XX_WHITE); 
+  tft.fillCircle(x, y + 5, 5, ST77XX_RED);
 }
+
 void drawO2Icon(int x, int y) {
-  tft.fillCircle(x, y + 2, 6, ST77XX_CYAN); tft.fillTriangle(x - 6, y + 2, x + 6, y + 2, x, y - 7, ST77XX_CYAN);
+  tft.fillCircle(x, y + 2, 6, ST77XX_CYAN); 
+  tft.fillTriangle(x - 6, y + 2, x + 6, y + 2, x, y - 7, ST77XX_CYAN);
 }
+
 void drawHeartIcon(int x, int y) {
-  tft.fillCircle(x - 4, y, 5, ST77XX_RED); tft.fillCircle(x + 4, y, 5, ST77XX_RED); tft.fillTriangle(x - 9, y + 2, x + 9, y + 2, x, y + 11, ST77XX_RED);
+  tft.fillCircle(x - 4, y, 5, ST77XX_RED); 
+  tft.fillCircle(x + 4, y, 5, ST77XX_RED); 
+  tft.fillTriangle(x - 9, y + 2, x + 9, y + 2, x, y + 11, ST77XX_RED);
 }
 
 void drawBaseScreen(String status) {
   tft.fillScreen(ST77XX_BLACK); tft.setTextColor(ST77XX_WHITE); tft.setTextSize(1);
-  tft.setCursor(5, 5); tft.print("Status: "); tft.setTextColor(ST77XX_YELLOW); tft.println(status);
+  tft.setCursor(5, 5); tft.print("Status: "); 
+  tft.setTextColor(ST77XX_YELLOW); tft.println(status);
   tft.drawLine(0, 18, screenW, 18, ST77XX_WHITE);
 }
 
@@ -91,7 +101,7 @@ void drawResultsScreen(float temp, int bpm, int spo2) {
 }
 
 // ==========================================
-// HARDWARE SETUP
+// 4. HARDWARE SETUP
 // ==========================================
 void setupI2S() {
   i2s_config_t i2s_mic_config = {
@@ -121,19 +131,27 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIR_PIN, INPUT);
 
-  tft.initR(INITR_GREENTAB); tft.setRotation(1); 
+  // BUG FIX 1: GREENTAB added for your specific screen hardware
+  tft.initR(INITR_GREENTAB); 
+  tft.setRotation(1); 
   playBootAnimation();
 
   deviceMacAddress = WiFi.macAddress();
+  Serial.println("Device ID: " + deviceMacAddress);
   
   WiFiManager wm;
   drawBaseScreen("CONNECT PHONE TO\n'ASTRA_Setup'");
   bool res = wm.autoConnect("ASTRA_Setup"); 
-  if(!res) { ESP.restart(); } 
+  if(!res) { 
+    drawBaseScreen("WIFI FAILED");
+    delay(3000);
+    ESP.restart(); 
+  } 
 
+  Wire.begin(21, 22);
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("MAX30102 was not found.");
-    while (1);
+    drawBaseScreen("SENSOR ERROR");
+    while (1) { delay(100); } // BUG FIX 3: Watchdog protection
   }
   particleSensor.setup(); 
   particleSensor.setPulseAmplitudeRed(0x0A); 
@@ -145,7 +163,7 @@ void setup() {
 }
 
 // ==========================================
-// MAIN LOGIC
+// 5. MAIN LOGIC
 // ==========================================
 void measureVitals(float &temp, int &bpm) {
   drawBaseScreen("Place finger...");
@@ -165,6 +183,7 @@ void measureVitals(float &temp, int &bpm) {
         beatCount++;
       }
     }
+    delay(10); // BUG FIX 3: Watchdog protection
   }
 
   if (beatCount == 0) bpm = 0; 
@@ -183,6 +202,8 @@ void processInteraction() {
   tft.setCursor(45, 30); tft.print("Speak now!");
 
   uint32_t bufferSize = SAMPLE_RATE * 2 * RECORD_TIME; 
+  
+  // BUG FIX 2: Standard malloc used to prevent PSRAM crash
   uint8_t* audioBuffer = (uint8_t*)malloc(bufferSize);
 
   if(audioBuffer == NULL) {
@@ -198,6 +219,7 @@ void processInteraction() {
     size_t bytes_read;
     i2s_read(I2S_NUM_0, &audioBuffer[bytesReadTotal], 1024, &bytes_read, 10);
     bytesReadTotal += bytes_read;
+    delay(1); // BUG FIX 3: Watchdog protection
   }
 
   drawBaseScreen("Sending Data...");
@@ -239,6 +261,3 @@ void loop() {
   }
   delay(100);
 }
-
-
-Esp32_Medical_App_Gemini.ino
