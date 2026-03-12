@@ -121,7 +121,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIR_PIN, INPUT);
 
-  tft.initR(INITR_BLACKTAB); tft.setRotation(1); 
+  tft.initR(INITR_GREENTAB); tft.setRotation(1); 
   playBootAnimation();
 
   deviceMacAddress = WiFi.macAddress();
