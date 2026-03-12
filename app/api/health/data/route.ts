@@ -2,29 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// 1. Setup Clients
-// We use the Service Role Key here because the ESP32 cannot send browser session cookies.
+// 1. Setup Clients using your Vercel Environment Variables
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
 
-// Helper: Convert raw ESP32 PCM audio to a valid WAV file format for Gemini
-function createWavHeader(dataLength: number, sampleRate = 16000) {
+// 2. Hardcoded Voice ID (No .env key needed for this!)
+// "cgSgspJ2msm6clMCkdW9" is a default friendly voice. 
+// You can change this string later if you want a different sounding robot.
+const ELEVENLABS_VOICE_ID = "cgSgspJ2msm6clMCkdW9"; 
+
+// Helper to convert ESP32 Mic Data to valid WAV
+function createWavHeader(dataLength: number, sampleRate = 8000) {
   const header = Buffer.alloc(44);
   header.write('RIFF', 0);
   header.writeUInt32LE(36 + dataLength, 4);
   header.write('WAVE', 8);
   header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16); // PCM
-  header.writeUInt16LE(1, 20); // AudioFormat (1 = PCM)
-  header.writeUInt16LE(1, 22); // NumChannels (1 = Mono)
-  header.writeUInt32LE(sampleRate, 24); // SampleRate
-  header.writeUInt32LE(sampleRate * 2, 28); // ByteRate
-  header.writeUInt16LE(2, 32); // BlockAlign
-  header.writeUInt16LE(16, 34); // BitsPerSample
+  header.writeUInt32LE(16, 16); 
+  header.writeUInt16LE(1, 20); 
+  header.writeUInt16LE(1, 22); 
+  header.writeUInt32LE(sampleRate, 24); 
+  header.writeUInt32LE(sampleRate * 2, 28); 
+  header.writeUInt16LE(2, 32); 
+  header.writeUInt16LE(16, 34); 
   header.write('data', 36);
   header.writeUInt32LE(dataLength, 40);
   return header;
@@ -32,12 +37,16 @@ function createWavHeader(dataLength: number, sampleRate = 16000) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 2. Extract Vitals from Custom ESP32 Headers
+    const deviceId = request.headers.get('X-Device-Id') || 'unknown-device';
     const temp = request.headers.get('X-Temp');
     const bpm = request.headers.get('X-Bpm');
     const spo2 = request.headers.get('X-Spo2');
 
-    // 3. Extract Raw Audio Bytes from ESP32 Body
+    // 3. Fetch ALL registered users for Voice ID Matching
+    const { data: allUsers } = await supabaseAdmin.from('users').select('id, name, age, gender');
+    const knownUsersString = JSON.stringify(allUsers || []);
+
+    // 4. Extract Raw Audio
     const rawAudio = await request.arrayBuffer();
     const audioData = Buffer.from(rawAudio);
 
@@ -45,22 +54,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No audio data received' }, { status: 400 });
     }
 
-    // 4. Format Audio for Gemini
-    // The ESP32 mic records raw waves. Gemini needs a WAV container to understand it.
-    const wavHeader = createWavHeader(audioData.length);
+    const wavHeader = createWavHeader(audioData.length, 8000);
     const validWavFile = Buffer.concat([wavHeader, audioData]);
 
-    // 5. Call Gemini 1.5 Flash (Multimodal Audio + Text)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `You are A.S.T.R.A, a friendly AI health assistant.
-    The user has submitted a voice question. Listen to the attached audio.
-    Here are their current real-time vitals:
-    - Temperature: ${temp}°C
-    - Heart Rate: ${bpm} BPM
-    - Blood Oxygen: ${spo2}%
+    // 5. Call Gemini (JSON Mode Enforced)
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash",
+      generationConfig: { responseMimeType: "application/json" } 
+    }); 
 
-    Respond directly to their voice question while taking these vitals into account.
-    Keep your response brief (2-3 sentences max) so it can be spoken aloud easily.`;
+    const prompt = `You are A.S.T.R.A, an AI health assistant.
+    Here is the list of registered users in the household: ${knownUsersString}
+    Here are the user's vitals: Temp: ${temp}°C, HR: ${bpm} BPM, SpO2: ${spo2}%
+
+    Identify who is speaking from the user list. If you identify them, use their age and gender to inform your medical response.
+    Generate a helpful 2-3 sentence verbal response. Keep it conversational.
+    
+    Output valid JSON strictly in this schema:
+    {
+      "identified_user_id": "the 'id' of the matching user from the list, or null if unknown",
+      "identified_name": "the exact name of the user, or 'Unknown'",
+      "ai_response": "your 2-3 sentence medical response"
+    }`;
 
     const result = await model.generateContent([
       prompt,
@@ -72,14 +87,16 @@ export async function POST(request: NextRequest) {
       }
     ]);
 
-    const geminiTextResponse = result.response.text();
+    const aiOutput = JSON.parse(result.response.text());
 
-    // 6. Save to Supabase (Background Logging)
-    await supabaseAdmin.from('health_data').insert({
+    // 6. Save interaction to database asynchronously
+    supabaseAdmin.from('health_data').insert({
+      device_id: deviceId,
+      user_id: aiOutput.identified_user_id,
       temperature: parseFloat(temp || '0'),
       bpm: parseInt(bpm || '0'),
       spo2: parseInt(spo2 || '0'),
-      ai_response: geminiTextResponse,
+      ai_response: aiOutput.ai_response,
     });
 
     // --- DEV MODE TOGGLE ---
@@ -137,7 +154,7 @@ export async function POST(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Length': audioOutputBuffer.length.toString(),
+        'X-Identified-Name': aiOutput.identified_name || 'Patient'
       },
     });
 
