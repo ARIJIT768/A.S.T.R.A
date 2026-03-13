@@ -11,10 +11,6 @@ const supabaseAdmin = createClient(
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
 
-// 2. Hardcoded Voice ID (No .env key needed for this!)
-// "cgSgspJ2msm6clMCkdW9" is a default friendly voice. 
-// You can change this string later if you want a different sounding robot.
-const ELEVENLABS_VOICE_ID = "cgSgspJ2msm6clMCkdW9"; 
 
 // Helper to convert ESP32 Mic Data to valid WAV
 function createWavHeader(dataLength: number, sampleRate = 8000) {
@@ -100,32 +96,27 @@ export async function POST(request: NextRequest) {
     });
 
     // --- DEV MODE TOGGLE ---
-    // Set this to 'true' while testing your ESP32 to save ElevenLabs credits!
-    // Set this to 'false' for your final college presentation.
     const DEV_TEST_MODE = true; 
 
     // 7. Convert Text Response to Speech (ElevenLabs TTS)
     let audioOutputBuffer = Buffer.from([]);
 
     if (DEV_TEST_MODE) {
-      // FREE TESTING MODE:
-      // Print what Gemini *would* have said to your VS Code terminal
+      // FREE TESTING MODE
       console.log("====================================");
       console.log("🤖 GEMINI RESPONSE (Audio Skipped):");
-      console.log(geminiTextResponse);
+      // FIX: Call the exact JSON property instead of the missing variable
+      console.log(aiOutput.ai_response);
       console.log("====================================");
       
-      // Send a tiny 1-second file of absolute silence to the ESP32 
-      // so the C++ code doesn't crash waiting for an audio file
       audioOutputBuffer = Buffer.alloc(16000 * 2); 
     } 
     else {
-      // PRODUCTION MODE: Call ElevenLabs
+      // PRODUCTION MODE
       const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY; 
       if (elevenLabsApiKey) {
-        const voiceId = "21m00Tcm4TlvDq8ikWAM"; // Voice: Rachel
+        const voiceId = "21m00Tcm4TlvDq8ikWAM"; 
         
-        // The ?output_format=pcm_16000 parameter tells ElevenLabs to send raw audio directly for the ESP32!
         const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=pcm_16000`, {
           method: 'POST',
           headers: { 
@@ -133,7 +124,8 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/json' 
           },
           body: JSON.stringify({
-            text: geminiTextResponse,
+            // FIX: Call the exact JSON property here too!
+            text: aiOutput.ai_response,
             model_id: "eleven_turbo_v2", 
           })
         });
