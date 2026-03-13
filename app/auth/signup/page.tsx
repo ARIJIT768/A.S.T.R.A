@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Signup() {
@@ -60,18 +61,31 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background blobs - Added pointer-events-none to prevent blocking clicks */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-green-700 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob pointer-events-none"></div>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-green-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000 pointer-events-none"></div>
-      <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000 pointer-events-none"></div>
+    // Changed main background gradient to include a deep blue tint
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-blue-950 flex items-center justify-center p-4 relative overflow-hidden">
+      
+      {/* Animated background blobs - Updated to Blues and Cyans */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-blue-800 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-700 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000 pointer-events-none"></div>
+      <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000 pointer-events-none"></div>
 
-      <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10 backdrop-blur-sm border border-slate-700/50 animate-fade-in max-h-[90vh] overflow-y-auto no-scrollbar">
+      <div className="bg-slate-800/80 rounded-2xl shadow-2xl p-8 w-full max-w-md relative z-10 backdrop-blur-md border border-slate-700/50 animate-fade-in max-h-[90vh] overflow-y-auto no-scrollbar">
         <div className="mb-8 text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg transform hover:scale-110 transition-transform duration-300 animate-float">
-            <span className="text-white font-bold text-2xl">M</span>
+          
+          {/* --- LOGO SECTION --- */}
+          <div className="w-16 h-16 mx-auto mb-4 relative shadow-lg transform hover:scale-110 transition-transform duration-300 animate-float rounded-xl overflow-hidden bg-white/10 flex items-center justify-center">
+             <Image 
+              src="/logo.jpeg" 
+              alt="A.S.T.R.A Logo" 
+              fill
+              className="object-contain p-1"
+              sizes="64px"
+              priority
+            />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">A.S.T.R.A</h1>
+          
+          {/* Title gradient updated to match logo (Dark blue to Cyan) */}
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">A.S.T.R.A</h1>
           <p className="text-slate-400 mt-2 font-medium">Create your health account</p>
         </div>
 
@@ -89,7 +103,7 @@ export default function Signup() {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent bg-slate-700 text-white placeholder-slate-400 transition-all duration-200"
+              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-slate-700/50 text-white placeholder-slate-400 transition-all duration-200"
               placeholder="John Doe"
             />
           </div>
@@ -101,12 +115,11 @@ export default function Signup() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent bg-slate-700 text-white placeholder-slate-400 transition-all duration-200"
+              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-slate-700/50 text-white placeholder-slate-400 transition-all duration-200"
               placeholder="you@example.com"
             />
           </div>
 
-          {/* Corrected 2-column grid layout for Age and Gender */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-2">Age</label>
@@ -115,7 +128,7 @@ export default function Signup() {
                 name="age"
                 value={formData.age}
                 onChange={handleChange}
-                className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent bg-slate-700 text-white placeholder-slate-400 transition-all duration-200"
+                className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-slate-700/50 text-white placeholder-slate-400 transition-all duration-200"
                 placeholder="25"
               />
             </div>
@@ -126,7 +139,7 @@ export default function Signup() {
                 name="gender"
                 value={formData.gender}
                 onChange={handleChange}
-                className="relative z-50 w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent bg-slate-700 text-white cursor-pointer"
+                className="relative z-50 w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-slate-700/50 text-white cursor-pointer"
               >
                 <option value="" disabled className="bg-slate-700 text-slate-400">Select Gender</option>
                 <option value="male" className="bg-slate-700 text-white">Male</option>
@@ -143,7 +156,7 @@ export default function Signup() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent bg-slate-700 text-white placeholder-slate-400 transition-all duration-200"
+              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-slate-700/50 text-white placeholder-slate-400 transition-all duration-200"
               placeholder="••••••••"
             />
           </div>
@@ -155,15 +168,16 @@ export default function Signup() {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent bg-slate-700 text-white placeholder-slate-400 transition-all duration-200"
+              className="w-full px-4 h-12 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-slate-700/50 text-white placeholder-slate-400 transition-all duration-200"
               placeholder="••••••••"
             />
           </div>
 
+          {/* Button updated to Blue/Cyan gradient */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white h-12 rounded-lg font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed mt-6 transform hover:scale-105 active:scale-95"
+            className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white h-12 rounded-lg font-semibold hover:shadow-lg hover:shadow-cyan-500/40 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed mt-6 transform hover:scale-105 active:scale-95"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -178,7 +192,8 @@ export default function Signup() {
 
         <p className="text-center text-slate-300 mt-4">
           Already have an account?{' '}
-          <a href="/auth/login" className="text-green-400 font-semibold hover:underline transition-all duration-200">
+          {/* Link updated to Cyan */}
+          <a href="/auth/login" className="text-cyan-400 font-semibold hover:underline transition-all duration-200">
             Login here
           </a>
         </p>

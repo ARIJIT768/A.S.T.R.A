@@ -31,21 +31,9 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="search"],
-input[type="number"], /* Added this for your Age field too! */
+input[type="number"], 
 textarea,
-select {               /* <--- ADD THIS LINE */
-  -webkit-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
-}
-
-/* Allow selection in specific inputs if needed */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="search"],
-textarea {
+select {               
   -webkit-user-select: text;
   -moz-user-select: text;
   -ms-user-select: text;
@@ -174,6 +162,7 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
 /* Animation delay utilities */
 .animate-blob {
   animation: blob 7s infinite;
@@ -211,8 +200,8 @@ select option {
 }
 
 select option:checked {
-  background: linear-gradient(#16a34a, #16a34a);
-  background-color: #16a34a;
+  background: linear-gradient(#3b82f6, #3b82f6);
+  background-color: #3b82f6;
   color: white;
 }
 
